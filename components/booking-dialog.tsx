@@ -330,6 +330,7 @@ export function BookingDialog({
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
                     >
+                      <Link href={`/payment/crypto/${appointmentId}`}>
                       <Button
                         onClick={() => handlePayment('crypto')}
                         size="lg"
@@ -344,6 +345,7 @@ export function BookingDialog({
                           </span>
                         </div>
                       </Button>
+                      </Link>
                     </motion.div>
                   </div>
 

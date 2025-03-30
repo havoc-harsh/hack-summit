@@ -3,6 +3,7 @@
 
 import { SessionProvider } from "next-auth/react";
 import StoreProvider from "./StoreProvider";
+import { EthProvider } from "@/lib/eth-context";
 
 export default function ClientProvider({
   children,
@@ -12,7 +13,9 @@ export default function ClientProvider({
   return (
     <SessionProvider>
       <StoreProvider>
-        {children}
+        <EthProvider>
+          {children}
+        </EthProvider>
       </StoreProvider>
     </SessionProvider>
   );
