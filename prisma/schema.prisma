@@ -19,7 +19,7 @@ model User {
   longitude       Float          @default(0.0)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime
- // Added relation to Appointment
+  appointments    Appointment[] // Added relation to Appointment
 }
 
 model Profile {
@@ -150,18 +150,22 @@ model Announcement {
 }
 
 model Appointment {
-  id         Int       @id @default(autoincrement())
-  patient    String    // Name of the patient
-  phone      String    // Phone number of the patient
-  symptoms   String    // Description of symptoms
-  latitude   Float     // Latitude of the patient's location
-  longitude  Float     // Longitude of the patient's location
-  date       DateTime  // Date of the appointment
-  time      String    // Time of the appointment (e.g., "10:00 AM")
-  alert      String[] @default([])  // Whether the appointment is urgent
-  hospitalId Int       // Foreign key to the Hospital model
-  hospital   Hospital  @relation(fields: [hospitalId], references: [id])
-// Relationship to User
+  id             Int       @id @default(autoincrement())
+  patient        String    // Name of the patient
+  phone          String    // Phone number of the patient
+  symptoms       String    // Description of symptoms
+  latitude       Float     // Latitude of the patient's location
+  longitude      Float     // Longitude of the patient's location
+  date           DateTime  // Date of the appointment
+  time           String    // Time of the appointment (e.g., "10:00 AM")
+  alert          String[] @default([])  // Whether the appointment is urgent
+  status         String   @default("scheduled") // Status of the appointment: scheduled, completed, cancelled
+  paymentStatus  String   @default("pending") // Payment status: pending, completed
+  hospitalId     Int       // Foreign key to the Hospital model
+  hospital       Hospital  @relation(fields: [hospitalId], references: [id])
+  userId         Int?      // Foreign key to the User model (optional for existing records)
+  user           User?     @relation(fields: [userId], references: [id])
+  createdAt      DateTime  @default(now())
 }
 
 model Stats {
