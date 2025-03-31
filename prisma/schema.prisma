@@ -78,9 +78,9 @@ model Hospital {
   alerts          Alert[]
   announcements   Announcement[]
   appointments    Appointment[]
+  emergencyRequests EmergencyRequest[]
   stats           Stats?
   createdAt       DateTime       @default(now())
-
 }
 
 model Bed {
@@ -171,4 +171,22 @@ model Stats {
   emergencyResponse Int     @default(0)
   hospitalId       Int      @unique
   hospital         Hospital @relation(fields: [hospitalId], references: [id])
+}
+
+model EmergencyRequest {
+  id            Int       @id @default(autoincrement())
+  hospitalId    Int
+  hospital      Hospital  @relation(fields: [hospitalId], references: [id])
+  serviceType   String    // "ambulances", "blood", "oxygen", "icu"
+  quantity      Int
+  status        String    @default("pending") // "pending", "approved", "fulfilled", "rejected"
+  patientName   String
+  patientId     String?   // Can be null for anonymous requests
+  patientPhone  String
+  reason        String
+  latitude      Float
+  longitude     Float
+  requestDate   DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

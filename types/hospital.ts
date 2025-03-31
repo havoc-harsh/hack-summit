@@ -10,24 +10,23 @@ export interface Doctor {
 export interface Hospital {
   id: number;
   name: string;
-  address: string;
+  location: string;
   consultationFee: string;
   rating: string;
-  experience?: string;
   waitTime: string;
   contact: string;
-  ambulance: number;
+  ambulances: number;
   blood: number;
   oxygen: number;
-  beds: number;
+  icu: number;
   latitude: number;
   longitude: number;
   specialities: string[];
-  about?: string;
-  nextAvailable?: string;
-  verified?: boolean;
-  amenities?: string[];
-  doctors: Doctor[];
+  about: string;
+  nextAvailable: string;
+  verified: boolean;
+  amenities: string[];
+  doctors: { name: string; specialty: string; experience: string }[];
 }
 
 export interface BookingData {
