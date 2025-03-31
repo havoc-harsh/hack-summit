@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, X, ArrowLeft } from "lucide-react";
+import { Search, X, ArrowLeft, Heart, Wind, Droplet, User } from "lucide-react";
 import AuthNavbar from "@/components/AuthNavbar";
-import { hospitals as allProviders } from "@/data/hospital";
+import { getHospitals} from "@/data/hospital";
 import { Hospital } from "@/types/hospital";
 
 // Define service configurations for UI styling
@@ -17,21 +17,25 @@ const serviceConfig = {
     color: "bg-green-100 text-green-800",
     border: "border-green-200",
     hover: "hover:bg-green-50",
+    icon: <User size={18} className="mr-2" />
   },
   blood: {
     color: "bg-red-100 text-red-800",
     border: "border-red-200",
     hover: "hover:bg-red-50",
+    icon: <Droplet size={18} className="mr-2" />
   },
   oxygen: {
     color: "bg-blue-100 text-blue-800",
     border: "border-blue-200",
     hover: "hover:bg-blue-50",
+    icon: <Wind size={18} className="mr-2" />
   },
   icu: {
     color: "bg-purple-100 text-purple-800",
     border: "border-purple-200",
     hover: "hover:bg-purple-50",
+    icon: <Heart size={18} className="mr-2" />
   },
 } as const;
 
@@ -43,6 +47,27 @@ export default function ServicesPage() {
   const router = useRouter();
   const [selectedService, setSelectedService] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [allProviders, setAllProviders] = useState<Hospital[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      try {
+        const data = await getHospitals();
+        console.log("Fetched hospital data:", data);
+        setAllProviders(data);
+      } catch (err) {
+        console.error('Error fetching hospitals:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load hospitals');
+        setAllProviders([]); // Set empty array if API fails
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHospitals();
+  }, []);
 
   // ✅ **Fixed Filtering Logic**
   const filteredProviders = allProviders.filter((provider) => {
@@ -118,7 +143,19 @@ export default function ServicesPage() {
         {/* Display Filtered Results */}
         <AnimatePresence mode="wait">
           <motion.div key={selectedService + searchQuery} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProviders.length > 0 ? (
+            {loading ? (
+              <div className="col-span-full flex justify-center items-center p-8">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="h-12 w-12 border-4 border-t-sky-500 border-sky-200 rounded-full animate-spin"></div>
+                  <p className="text-sky-600 font-medium">Loading hospitals...</p>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="col-span-full text-center p-8">
+                <p className="text-red-500 mb-2">Error loading hospitals</p>
+                <p className="text-gray-500">{error}</p>
+              </div>
+            ) : filteredProviders.length > 0 ? (
               filteredProviders.map((provider) => (
                 <ServiceProviderCard key={provider.id} provider={provider} service={selectedService} />
               ))
@@ -137,7 +174,13 @@ export default function ServicesPage() {
 // **Service Provider Card Component**
 function ServiceProviderCard({ provider, service }: { provider: Hospital; service: string }) {
   const serviceData = service ? serviceConfig[service as ServiceKey] : null;
-  const quantity = service && validServices.includes(service as ServiceKey) ? provider[service as ServiceKey] : null;
+  
+  // Get the quantity based on the selected service
+  let quantity = null;
+  if (service && validServices.includes(service as ServiceKey)) {
+    const serviceKey = service as ServiceKey;
+    quantity = provider[serviceKey] || 0;
+  }
 
   return (
     <Link href={`/services/${service}/${provider.id}`}>
@@ -149,13 +192,14 @@ function ServiceProviderCard({ provider, service }: { provider: Hospital; servic
               <p className="text-gray-500">{provider.location}</p>
             </div>
             {serviceData && quantity !== null && (
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${serviceData.color}`}>
+              <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${serviceData.color}`}>
+                {serviceData.icon}
                 {quantity} available
               </div>
             )}
           </div>
           <div className="mt-4 flex items-center justify-between">
-            <p className="text-gray-600">Rating: {provider.rating}</p>
+            <p className="text-gray-600">Rating: 4.2</p>
             {service && <Button variant="link" className="text-sky-600 hover:underline">View Details</Button>}
           </div>
         </div>

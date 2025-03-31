@@ -4,48 +4,82 @@ import { withApiKeyAuth } from '@/lib/api-middleware';
 
 export const GET = withApiKeyAuth(async (
   req: NextRequest,
-  context?: { params?: { id: string } }
+  context: { params: { id: string } }
 ) => {
   try {
     // Get the ID from context params or from the URL path
     let id: string;
-    
-    // With our fixed middleware, we can now safely access context.params
-    // without awaiting it, since the middleware already awaited it
-    if (context?.params?.id) {
+
+    if (context.params.id) {
       id = context.params.id;
     } else {
       // Extract ID from URL as fallback
       const urlParts = req.url.split('/');
       id = urlParts[urlParts.length - 1];
     }
-    
-    const appointmentId = parseInt(id);
-    
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Appointment ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const appointmentId = parseInt(id, 10);
+
     if (isNaN(appointmentId)) {
       return NextResponse.json(
         { error: 'Invalid appointment ID' },
         { status: 400 }
       );
     }
-    
+
+    // Fetch the appointment with hospital details
     const appointment = await prisma.appointment.findUnique({
       where: {
         id: appointmentId,
       },
       include: {
-        hospital: true,
+        hospital: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            phone: true,
+          },
+        },
       },
     });
-    
+
     if (!appointment) {
       return NextResponse.json(
         { error: 'Appointment not found' },
         { status: 404 }
       );
     }
-    
-    return NextResponse.json(appointment);
+
+    // Format the appointment data for the response
+    const formattedAppointment = {
+      id: appointment.id,
+      patient: appointment.patient,
+      phone: appointment.phone,
+      symptoms: appointment.symptoms,
+      latitude: appointment.latitude,
+      longitude: appointment.longitude,
+      date: appointment.date,
+      time: appointment.time,
+      status: appointment.status,
+      statusReason: appointment.statusReason,
+      paymentStatus: appointment.paymentStatus,
+      hospitalId: appointment.hospitalId,
+      hospitalName: appointment.hospital.name,
+      hospitalAddress: appointment.hospital.address,
+      hospitalPhone: appointment.hospital.phone,
+      userId: appointment.userId,
+      createdAt: appointment.createdAt,
+    };
+
+    return NextResponse.json(formattedAppointment);
   } catch (error) {
     console.error('Error fetching appointment:', error);
     return NextResponse.json(
@@ -53,4 +87,4 @@ export const GET = withApiKeyAuth(async (
       { status: 500 }
     );
   }
-}); 
+});

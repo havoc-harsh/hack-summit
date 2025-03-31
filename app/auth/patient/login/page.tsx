@@ -1,4 +1,3 @@
-// patient/login.tsx
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -121,7 +120,6 @@ export default function PatientLoginPage() {
         password: ""
       }));
       dispatch(setToken(session.accessToken || ""));
-      
       if (session.user.id) {
         checkMedicalProfile(session.user.id);
       }
@@ -156,12 +154,12 @@ export default function PatientLoginPage() {
             <div className="w-full lg:w-1/2 bg-white flex flex-col justify-center px-12">
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold text-gray-900">Patient Login</h2>
-                <p className="text-gray-600">Sign in to access your dashboard</p>
+                <p className="text-gray-600">Sign in to access your patient dashboard</p>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <div>
-                  <label className="block text-gray-700 mb-2">Email</label>
+                  <label className="block text-gray-700 mb-2">Email Address</label>
                   <input
                     {...register("email")}
                     type="email"
@@ -205,9 +203,9 @@ export default function PatientLoginPage() {
 
               <div className="mt-6 text-center">
                 <p className="text-gray-600">
-                  New user?{" "}
+                  Don't have an account?{" "}
                   <Link href="/auth/patient/register" className="text-blue-600 hover:underline">
-                    Create account
+                    Register here
                   </Link>
                 </p>
               </div>

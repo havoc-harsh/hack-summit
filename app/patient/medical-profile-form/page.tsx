@@ -16,7 +16,25 @@ export default function MedicalProfileForm() {
   const [phoneError, setPhoneError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setError(null);
+    
+    if (status === "loading") return;
+    
+    if (!session) {
+      setError("You need to be logged in to create a medical profile. Redirecting to login...");
+      setTimeout(() => router.push("/auth/patient/login"), 2000);
+      return;
+    }
+    
+    if (!session.user?.id) {
+      setError("Your user account is missing required information. Please contact support.");
+      console.error("Session exists but user ID is missing", session);
+    }
+  }, [session, status, router]);
 
   const validatePhone = (value: string) => {
     const phoneRegex = /^\+91[6-9]\d{9}$/;
@@ -30,7 +48,6 @@ export default function MedicalProfileForm() {
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Ensure the phone number always starts with +91
     if (!value.startsWith("+91")) {
       setPhone("+91" + value.replace("+91", ""));
     } else {
@@ -38,7 +55,6 @@ export default function MedicalProfileForm() {
     }
   };
 
-  // Add input length validation
   const handleInput = (
     e: React.KeyboardEvent<HTMLInputElement>,
     maxLength: number
@@ -51,14 +67,22 @@ export default function MedicalProfileForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    
+    setError(null);
+
     if (!validatePhone(phone)) {
       setSubmitting(false);
       return;
     }
-    
+
+    if (!session?.user?.id) {
+      setError("User not authenticated. Redirecting to login...");
+      setTimeout(() => router.push("/auth/patient/login"), 2000);
+      setSubmitting(false);
+      return;
+    }
+
     const data = {
-      userId: session?.user.id,
+      userId: session.user.id,
       bloodType,
       allergies,
       medications,
@@ -74,13 +98,16 @@ export default function MedicalProfileForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (res.ok) {
-        router.push("/patient/dashboard");
-      } else {
-        console.error("Failed to submit form");
+
+      const responseData = await res.json();
+      if (!res.ok) {
+        throw new Error(responseData.error || "Failed to submit profile");
       }
+
+      router.push("/patient/dashboard");
     } catch (error) {
-      console.error("Error submitting form:", error);
+      console.error("Submission error:", error);
+      setError(error instanceof Error ? error.message : "An unexpected error occurred");
     } finally {
       setSubmitting(false);
     }
@@ -101,6 +128,24 @@ export default function MedicalProfileForm() {
         className="max-w-2xl w-full p-6 bg-white rounded-lg shadow-md"
       >
         <h2 className="text-2xl font-bold mb-4">Complete Your Medical Profile</h2>
+        
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md border border-red-200">
+            {error}
+            {error.includes("User not found") && (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="bg-red-100 text-red-800 hover:bg-red-200 py-1 px-3 rounded-md text-sm ml-2"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Blood Type</label>
