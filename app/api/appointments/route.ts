@@ -19,17 +19,28 @@ export async function POST(request: NextRequest) {
       { key: 'hospitalId', type: 'number' },
     ];
 
+    // Optional fields validation
+    const optionalFields = [
+      { key: 'userId', type: 'number' },
+    ];
+    
     const missingFields = requiredFields.filter(field => {
       // If the field doesn't exist or its type doesn't match
       return !(field.key in body) || typeof body[field.key] !== field.type;
     });
 
-    if (missingFields.length > 0) {
-      console.error('Validation failed. Missing/invalid fields:', missingFields);
+    // Validate optional fields if they exist
+    const invalidOptionalFields = optionalFields.filter(field => {
+      return field.key in body && typeof body[field.key] !== field.type;
+    });
+
+    if (missingFields.length > 0 || invalidOptionalFields.length > 0) {
+      const allInvalidFields = [...missingFields, ...invalidOptionalFields];
+      console.error('Validation failed. Missing/invalid fields:', allInvalidFields);
       return NextResponse.json(
         { 
           error: 'Invalid request data',
-          details: missingFields.map(f => `${f.key} (expected ${f.type})`)
+          details: allInvalidFields.map(f => `${f.key} (expected ${f.type})`)
         },
         { status: 400 }
       );
@@ -76,6 +87,7 @@ export async function POST(request: NextRequest) {
         // Use provided alert if available; otherwise, default to an empty array
         alert: body.alert && Array.isArray(body.alert) ? body.alert : [],
         hospitalId: body.hospitalId,
+        userId: body.userId || null, // Use userId if provided, otherwise null
       },
     });
 
