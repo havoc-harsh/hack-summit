@@ -37,6 +37,7 @@ model MedicalProfile {
   conditions        String[]         @default([])
   vaccinations      String[]         @default([])
   lastCheckup       DateTime         @default(now())
+  phone             String           @default("+91")
   care_instructions String[]         @default([])
   favoriteDoctors   FavoriteDoctor[]
   userId            Int              @unique @map("user_id") @default(1)
@@ -132,12 +133,24 @@ model Doctor {
 }
 
 model Alert {
-  id         Int       @id @default(autoincrement())
-  type       String
-  location   String
-  time       DateTime  @default(now())
-  hospitalId Int
-  hospital   Hospital  @relation(fields: [hospitalId], references: [id])
+  id                 Int       @id @default(autoincrement())
+  type               String
+  location           String
+  time               DateTime  @default(now())
+  commonSymptoms     String[]  @default([])
+  symptomCounts      Int[]     @default([])
+  symptomFrequencies Float[]   @default([])
+  possibleDiseases   String[]  @default([])
+  severity           String    @default("Unknown")
+  precautions        String[]  @default([])
+  description        String    @default("")
+  outbreakRadiusKm   Float     @default(0.0)
+  centerLatitude     Float     @default(0.0)
+  centerLongitude    Float     @default(0.0)
+  appointmentsCount  Int       @default(0)
+  thresholdUsed      Float     @default(0.0)
+  hospitalId         Int
+  hospital           Hospital  @relation(fields: [hospitalId], references: [id])
 }
 
 model Announcement {
@@ -166,13 +179,4 @@ model Appointment {
   userId         Int?
   user           User?     @relation(fields: [userId], references: [id])
   createdAt      DateTime  @default(now())
-}
-
-model Stats {
-  id               Int      @id @default(autoincrement())
-  satisfaction     Int      @default(0)
-  recoveryRate     Int      @default(0)
-  emergencyResponse Int     @default(0)
-  hospitalId       Int      @unique
-  hospital         Hospital @relation(fields: [hospitalId], references: [id])
 }

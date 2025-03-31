@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/app/lib/prisma';
+import { withApiKeyAuth } from '@/lib/api-middleware';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export const GET = withApiKeyAuth(async (
+  req: NextRequest,
+  context: { params: { id: string } }
+) => {
   try {
-    const { id } = params;
+    // Get the ID from context params or from the URL path
+    let id: string;
+
+    if (context.params.id) {
+      id = context.params.id;
+    } else {
+      // Extract ID from URL as fallback
+      const urlParts = req.url.split('/');
+      id = urlParts[urlParts.length - 1];
+    }
 
     if (!id) {
       return NextResponse.json(
@@ -15,12 +25,11 @@ export async function GET(
       );
     }
 
-    // Convert appointmentId to number
     const appointmentId = parseInt(id, 10);
 
     if (isNaN(appointmentId)) {
       return NextResponse.json(
-        { error: 'Invalid Appointment ID format' },
+        { error: 'Invalid appointment ID' },
         { status: 400 }
       );
     }
@@ -78,4 +87,4 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+});

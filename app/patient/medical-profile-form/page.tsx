@@ -12,67 +12,75 @@ export default function MedicalProfileForm() {
   const [conditions, setConditions] = useState<string[]>([]);
   const [vaccinations, setVaccinations] = useState<string[]>([]);
   const [lastCheckup, setLastCheckup] = useState("");
+  const [phone, setPhone] = useState("+91");
+  const [phoneError, setPhoneError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
   const [error, setError] = useState<string | null>(null);
 
-  // Add a useEffect to handle session checks
   useEffect(() => {
-    // Clear any previous errors
     setError(null);
     
-    // Check if session is still loading
-    if (status === "loading") {
+    if (status === "loading") return;
+    
+    if (!session) {
+      setError("You need to be logged in to create a medical profile. Redirecting to login...");
+      setTimeout(() => router.push("/auth/patient/login"), 2000);
       return;
     }
     
-    // Check if session is available
-    if (!session) {
-      setError("You need to be logged in to create a medical profile. Redirecting to login...");
-      // Redirect to login page after a delay
-      const timer = setTimeout(() => {
-        router.push("/auth/patient/login");
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-    
-    // Check if user ID is available
     if (!session.user?.id) {
       setError("Your user account is missing required information. Please contact support.");
       console.error("Session exists but user ID is missing", session);
-    } else {
-      console.log("Session loaded successfully, user ID:", session.user.id);
     }
   }, [session, status, router]);
 
+  const validatePhone = (value: string) => {
+    const phoneRegex = /^\+91[6-9]\d{9}$/;
+    if (!phoneRegex.test(value)) {
+      setPhoneError("Invalid Indian phone number format (+91 followed by 10 digits)");
+      return false;
+    }
+    setPhoneError("");
+    return true;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (!value.startsWith("+91")) {
+      setPhone("+91" + value.replace("+91", ""));
+    } else {
+      setPhone(value);
+    }
+  };
+
+  const handleInput = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    maxLength: number
+  ) => {
+    if (e.currentTarget.value.length >= maxLength) {
+      e.preventDefault();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Clear previous errors
+    setSubmitting(true);
     setError(null);
-    
-    // Check session again before submission
-    if (status === "loading") {
-      setError("Please wait, verifying your account...");
+
+    if (!validatePhone(phone)) {
+      setSubmitting(false);
       return;
     }
-    
+
     if (!session?.user?.id) {
-      setError("User not authenticated or missing ID. Please log in again.");
-      console.error("User not authenticated or missing ID");
-      
-      // Redirect to login page after a delay
-      setTimeout(() => {
-        router.push("/auth/patient/login");
-      }, 2000);
-      
+      setError("User not authenticated. Redirecting to login...");
+      setTimeout(() => router.push("/auth/patient/login"), 2000);
+      setSubmitting(false);
       return;
     }
-    
-    // Log the session and user ID for debugging
-    console.log("Session user:", session.user);
-    console.log("Submitting with user ID:", session.user.id);
-    
+
     const data = {
       userId: session.user.id,
       bloodType,
@@ -81,47 +89,27 @@ export default function MedicalProfileForm() {
       conditions,
       vaccinations,
       lastCheckup,
+      phone,
     };
 
     try {
-      console.log("Submitting data:", data);
-      
       const res = await fetch("/api/medical-profile/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      
-      // Get detailed response data
-      let responseData;
-      try {
-        responseData = await res.json();
-        console.log("API response:", responseData);
-      } catch (jsonError) {
-        console.error("Failed to parse JSON response:", jsonError);
-      }
-      
+
+      const responseData = await res.json();
       if (!res.ok) {
-        let errorMessage = "Failed to submit profile";
-        
-        if (responseData) {
-          errorMessage = responseData.error || responseData.message || errorMessage;
-          if (responseData.details) {
-            errorMessage += `: ${responseData.details}`;
-          }
-        } else {
-          errorMessage = res.statusText || errorMessage;
-        }
-        
-        throw new Error(errorMessage);
+        throw new Error(responseData.error || "Failed to submit profile");
       }
-      
-      // Success - navigate to dashboard
+
       router.push("/patient/dashboard");
     } catch (error) {
-      console.error("Error submitting form:", error);
-      // Set error state and display to user
+      console.error("Submission error:", error);
       setError(error instanceof Error ? error.message : "An unexpected error occurred");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -141,7 +129,6 @@ export default function MedicalProfileForm() {
       >
         <h2 className="text-2xl font-bold mb-4">Complete Your Medical Profile</h2>
         
-        {/* Display error message if present */}
         {error && (
           <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md border border-red-200">
             {error}
@@ -149,10 +136,7 @@ export default function MedicalProfileForm() {
               <div className="mt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setError(null);
-                    console.log("Retrying form submission with current session data");
-                  }}
+                  onClick={() => setError(null)}
                   className="bg-red-100 text-red-800 hover:bg-red-200 py-1 px-3 rounded-md text-sm ml-2"
                 >
                   Retry
@@ -161,7 +145,7 @@ export default function MedicalProfileForm() {
             )}
           </div>
         )}
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Blood Type</label>
@@ -175,6 +159,24 @@ export default function MedicalProfileForm() {
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={handlePhoneChange}
+              onKeyDown={(e) => handleInput(e, 13)}
+              onBlur={() => validatePhone(phone)}
+              className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 ${
+                phoneError ? 'border-red-500' : ''
+              }`}
+              placeholder="+91XXXXXXXXXX"
+              maxLength={13}
+            />
+            {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
+            <p className="text-xs text-gray-500 mt-1">Format: +91 followed by 10 digits starting with 6-9</p>
           </div>
 
           <div>
@@ -309,9 +311,12 @@ export default function MedicalProfileForm() {
 
           <button
             type="submit"
-            className="w-full py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            disabled={submitting}
+            className={`w-full py-2 px-4 bg-blue-500 text-white rounded-md ${
+              submitting ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-600'
+            }`}
           >
-            Submit
+            {submitting ? 'Submitting...' : 'Submit'}
           </button>
         </form>
       </motion.div>
