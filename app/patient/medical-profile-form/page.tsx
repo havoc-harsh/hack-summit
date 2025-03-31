@@ -12,11 +12,51 @@ export default function MedicalProfileForm() {
   const [conditions, setConditions] = useState<string[]>([]);
   const [vaccinations, setVaccinations] = useState<string[]>([]);
   const [lastCheckup, setLastCheckup] = useState("");
+  const [phone, setPhone] = useState("+91");
+  const [phoneError, setPhoneError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const { data: session } = useSession();
 
+  const validatePhone = (value: string) => {
+    const phoneRegex = /^\+91[6-9]\d{9}$/;
+    if (!phoneRegex.test(value)) {
+      setPhoneError("Invalid Indian phone number format (+91 followed by 10 digits)");
+      return false;
+    }
+    setPhoneError("");
+    return true;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Ensure the phone number always starts with +91
+    if (!value.startsWith("+91")) {
+      setPhone("+91" + value.replace("+91", ""));
+    } else {
+      setPhone(value);
+    }
+  };
+
+  // Add input length validation
+  const handleInput = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    maxLength: number
+  ) => {
+    if (e.currentTarget.value.length >= maxLength) {
+      e.preventDefault();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
+    
+    if (!validatePhone(phone)) {
+      setSubmitting(false);
+      return;
+    }
+    
     const data = {
       userId: session?.user.id,
       bloodType,
@@ -25,6 +65,7 @@ export default function MedicalProfileForm() {
       conditions,
       vaccinations,
       lastCheckup,
+      phone,
     };
 
     try {
@@ -40,6 +81,8 @@ export default function MedicalProfileForm() {
       }
     } catch (error) {
       console.error("Error submitting form:", error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -71,6 +114,24 @@ export default function MedicalProfileForm() {
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={handlePhoneChange}
+              onKeyDown={(e) => handleInput(e, 13)}
+              onBlur={() => validatePhone(phone)}
+              className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 ${
+                phoneError ? 'border-red-500' : ''
+              }`}
+              placeholder="+91XXXXXXXXXX"
+              maxLength={13}
+            />
+            {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
+            <p className="text-xs text-gray-500 mt-1">Format: +91 followed by 10 digits starting with 6-9</p>
           </div>
 
           <div>
@@ -205,9 +266,12 @@ export default function MedicalProfileForm() {
 
           <button
             type="submit"
-            className="w-full py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            disabled={submitting}
+            className={`w-full py-2 px-4 bg-blue-500 text-white rounded-md ${
+              submitting ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-600'
+            }`}
           >
-            Submit
+            {submitting ? 'Submitting...' : 'Submit'}
           </button>
         </form>
       </motion.div>

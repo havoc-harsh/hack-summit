@@ -37,6 +37,7 @@ model MedicalProfile {
   conditions        String[]         @default([])
   vaccinations      String[]         @default([])
   lastCheckup       DateTime         @default(now())
+  phone             String           @default("+91")  // Added phone field
   care_instructions String[]         @default([])
   favoriteDoctors   FavoriteDoctor[]
   userId            Int              @unique @map("user_id") @default(1) // Temporary default
@@ -132,12 +133,24 @@ model Doctor {
 }
 
 model Alert {
-  id         Int       @id @default(autoincrement())
-  type       String
-  location   String
-  time       DateTime  @default(now()) // Default to current time
-  hospitalId Int
-  hospital   Hospital  @relation(fields: [hospitalId], references: [id])
+  id                 Int       @id @default(autoincrement())
+  type               String
+  location           String
+  time               DateTime  @default(now())
+  commonSymptoms     String[]  @default([]) // Store symptom names
+  symptomCounts      Int[]     @default([]) // Store symptom counts
+  symptomFrequencies Float[]   @default([]) // Store symptom frequencies
+  possibleDiseases   String[]  @default([]) // Store possible diseases
+  severity           String    @default("Unknown") // Severity level (Low/Medium/High)
+  precautions        String[]  @default([]) // Precautions to take
+  description        String    @default("") // Medical description/analysis
+  outbreakRadiusKm   Float     @default(0.0) // Radius of the outbreak in km
+  centerLatitude     Float     @default(0.0) // Center latitude of outbreak
+  centerLongitude    Float     @default(0.0) // Center longitude of outbreak
+  appointmentsCount  Int       @default(0) // Number of appointments analyzed
+  thresholdUsed      Float     @default(0.0) // Threshold used for detection
+  hospitalId         Int
+  hospital           Hospital  @relation(fields: [hospitalId], references: [id])
 }
 
 model Announcement {

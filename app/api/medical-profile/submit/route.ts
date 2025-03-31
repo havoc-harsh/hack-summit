@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
         conditions: data.conditions || [],
         vaccinations: data.vaccinations || [],
         lastCheckup: data.lastCheckup ? new Date(data.lastCheckup) : undefined,
+        phone: data.phone || "",
       },
     });
     return NextResponse.json(medicalProfile);
