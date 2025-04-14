@@ -47,7 +47,7 @@ useEffect(() => {
   // Filter hospitals based on search query
   const filteredHospitals = allHospitals.filter((hospital) =>
     hospital.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    hospital.location.toLowerCase().includes(searchQuery.toLowerCase())
+    hospital.address.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (

@@ -1,73 +1,41 @@
 // pages/api/hospital/[hospitalId]/appointments.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/app/lib/prisma';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { hospitalId: string } }
 ) {
   try {
-    const { hospitalId } = params;
-    
-    // Ensure hospital ID is provided
-    if (!hospitalId) {
-      return NextResponse.json(
-        { error: 'Hospital ID is required' },
-        { status: 400 }
-      );
+    // Check if the user is authenticated
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse ID to integer
-    const hospitalIdNum = parseInt(hospitalId, 10);
-    if (isNaN(hospitalIdNum)) {
-      return NextResponse.json(
-        { error: 'Invalid hospital ID format' },
-        { status: 400 }
-      );
+    // Ensure the authenticated user's ID matches the hospitalId in the route
+    if (session.user.id !== params.hospitalId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if the hospital exists
-    const hospital = await prisma.hospital.findUnique({
-      where: { id: hospitalIdNum }
-    });
-
-    if (!hospital) {
-      return NextResponse.json(
-        { error: 'Hospital not found' },
-        { status: 404 }
-      );
+    // Convert hospitalId to an integer for database query
+    const hospitalId = parseInt(params.hospitalId);
+    if (isNaN(hospitalId)) {
+      return NextResponse.json({ error: 'Invalid hospital ID' }, { status: 400 });
     }
 
-    // Get appointments for this hospital, ordered by date (newest first)
+    // Fetch appointments from the database
     const appointments = await prisma.appointment.findMany({
-      where: { hospitalId: hospitalIdNum },
-      orderBy: [
-        { date: 'desc' },
-        { time: 'asc' }
-      ],
-      include: {
-        hospital: {
-          select: {
-            name: true,
-            address: true,
-          }
-        },
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          }
-        }
-      }
+      where: { hospitalId },
+      orderBy: { date: 'asc' }, // Optional: sort by date
     });
 
+    // Return the list of appointments
     return NextResponse.json(appointments);
   } catch (error) {
-    console.error('Error fetching hospital appointments:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch appointments' },
-      { status: 500 }
-    );
+    console.error('Error fetching appointments:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

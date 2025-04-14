@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 
 export function BookingDialog({
   hospital,
@@ -20,7 +19,6 @@ export function BookingDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const { data: session } = useSession();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [symptoms, setSymptoms] = useState('');
@@ -74,35 +72,7 @@ export function BookingDialog({
         throw new Error('Please select a valid date and time.');
       }
 
-      if (!session?.user?.id) {
-        throw new Error('Please log in to book an appointment');
-      }
-
-      let userId;
-      try {
-        userId = parseInt(session.user.id, 10);
-        if (isNaN(userId)) {
-          console.error("Failed to parse user ID:", session.user.id);
-          userId = null;
-        }
-      } catch (error) {
-        console.error("Error parsing user ID:", error);
-        userId = null;
-      }
-
-      type AppointmentPayload = {
-        patient: string;
-        phone: string;
-        symptoms: string;
-        latitude: number | null;
-        longitude: number | null;
-        date: Date;
-        time: string;
-        hospitalId: number;
-        userId?: number;
-      };
-
-      const payload: AppointmentPayload = {
+      const payload = {
         patient: name,
         phone,
         symptoms,
@@ -113,12 +83,6 @@ export function BookingDialog({
         hospitalId: hospital.id,
       };
 
-      if (userId !== null) {
-        payload.userId = userId;
-      }
-
-      console.log("Submitting appointment payload:", payload);
-
       const response = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,20 +92,7 @@ export function BookingDialog({
       const data = await response.json();
       
       if (!response.ok) {
-        console.error("API error response:", data);
         throw new Error(data.error || 'Failed to book appointment');
-      }
-
-      // Dispatch custom event for appointment scheduled
-      if (typeof window !== 'undefined') {
-        const customEvent = new CustomEvent('appointment_status_update', {
-          detail: {
-            appointmentId: data.id,
-            status: 'scheduled',
-            hospitalName: hospital.name
-          }
-        });
-        window.dispatchEvent(customEvent);
       }
 
       setAppointmentId(data.id);
@@ -155,20 +106,6 @@ export function BookingDialog({
 
   const handlePayment = (method: 'stripe' | 'crypto') => {
     if (!appointmentId) return;
-    
-    // Dispatch custom event for payment initiated
-    if (typeof window !== 'undefined') {
-      const customEvent = new CustomEvent('appointment_status_update', {
-        detail: {
-          appointmentId,
-          status: 'payment_initiated',
-          hospitalName: hospital.name,
-          payment: true
-        }
-      });
-      window.dispatchEvent(customEvent);
-    }
-    
     router.push(`/payment/${method}/${appointmentId}`);
     onOpenChange(false);
   };
@@ -393,7 +330,6 @@ export function BookingDialog({
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
                     >
-                      <Link href={`/payment/crypto/${appointmentId}`}>
                       <Button
                         onClick={() => handlePayment('crypto')}
                         size="lg"
@@ -408,7 +344,6 @@ export function BookingDialog({
                           </span>
                         </div>
                       </Button>
-                      </Link>
                     </motion.div>
                   </div>
 

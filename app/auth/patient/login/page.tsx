@@ -29,100 +29,63 @@ export default function PatientLoginPage() {
   const { data: session, status } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
 
+  // Prevent hydration mismatch
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
-  useEffect(() => {
-    const updateLocation = async (userId: string, latitude: number, longitude: number) => {
-      try {
-        await fetch("/api/users/update-location", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, latitude, longitude }),
-        });
-      } catch (error) {
-        console.error("Location update failed:", error);
-      }
-    };
-
-    const handleGeolocation = async (userId: string) => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            await updateLocation(userId, latitude, longitude);
-          },
-          (error) => {
-            console.error("Geolocation error:", error);
-            setLocationError("Location access denied. Some features may be limited.");
-          }
-        );
-      } else {
-        setLocationError("Geolocation not supported");
-      }
-    };
-
-    if (status === "authenticated" && session?.user?.id) {
-      handleGeolocation(session.user.id);
-    }
-  }, [status, session]);
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);
     try {
       const result = await signIn("patient-credentials", {
-        redirect: false,
+        redirect: false, // Handle redirect manually
         email: data.email,
         password: data.password,
       });
 
       if (result?.error) {
         dispatch(setError(result.error));
+        setIsLoading(false);
       }
     } catch (error: any) {
+      console.error("Login error:", error);
       dispatch(setError(error.message || "Login failed"));
-    } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle redirect based on medical profile after authentication
   useEffect(() => {
-    const checkMedicalProfile = async (userId: string) => {
-      try {
-        const response = await fetch("/api/medical-profile/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
+    if (status === "authenticated" && session) {
+      dispatch(
+        setUser({
+          name: session.user.name || "",
+          email: session.user.email,
+          password: "",
+        })
+      );
+      dispatch(setToken(session.accessToken || "authenticated"));
+      dispatch(setError(null));
+
+      // Check medical profile
+      fetch("/api/medical-profile/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: session.user.id }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.exists) {
+            router.push("/patient/dashboard");
+          } else {
+            router.push("/patient/medical-profile-form");
+          }
+        })
+        .catch((error) => {
+          console.error("Error checking medical profile:", error);
+          dispatch(setError("Failed to check medical profile"));
         });
-
-        if (!response.ok) throw new Error("Profile check failed");
-        
-        const { exists } = await response.json();
-        
-        if (exists) {
-          router.push("/patient/dashboard");
-        } else {
-          router.push("/patient/medical-profile-form");
-        }
-      } catch (error) {
-        console.error("Profile check error:", error);
-        router.push("/patient/dashboard");
-      }
-    };
-
-    if (status === "authenticated" && session?.user) {
-      dispatch(setUser({
-        name: session.user.name || "",
-        email: session.user.email || "",
-        password: ""
-      }));
-      dispatch(setToken(session.accessToken || ""));
-      if (session.user.id) {
-        checkMedicalProfile(session.user.id);
-      }
     }
   }, [status, session, dispatch, router]);
 
@@ -146,7 +109,7 @@ export default function PatientLoginPage() {
                 </div>
                 <h2 className="text-3xl font-bold mt-4">Welcome Back</h2>
                 <p className="opacity-80 mt-2">
-                  Log in to manage your health records
+                  Log in to manage your health records.
                 </p>
               </motion.div>
             </div>
@@ -154,7 +117,9 @@ export default function PatientLoginPage() {
             <div className="w-full lg:w-1/2 bg-white flex flex-col justify-center px-12">
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold text-gray-900">Patient Login</h2>
-                <p className="text-gray-600">Sign in to access your patient dashboard</p>
+                <p className="text-gray-600">
+                  Sign in to access your patient dashboard
+                </p>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -163,7 +128,7 @@ export default function PatientLoginPage() {
                   <input
                     {...register("email")}
                     type="email"
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="patient@example.com"
                   />
                   {errors.email && (
@@ -176,7 +141,7 @@ export default function PatientLoginPage() {
                   <input
                     {...register("password")}
                     type="password"
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="••••••••"
                   />
                   {errors.password && (
@@ -184,15 +149,12 @@ export default function PatientLoginPage() {
                   )}
                 </div>
 
-                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                {locationError && (
-                  <p className="text-yellow-600 text-sm text-center">{locationError}</p>
-                )}
+                {error && <p className="text-red-500 text-sm text-center"></p>}
 
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className={`w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex justify-center items-center gap-2 ${
+                  className={`w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 ${
                     isLoading ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
@@ -203,7 +165,7 @@ export default function PatientLoginPage() {
 
               <div className="mt-6 text-center">
                 <p className="text-gray-600">
-                  Don't have an account?{" "}
+                  Don&apos;t have an account?{" "}
                   <Link href="/auth/patient/register" className="text-blue-600 hover:underline">
                     Register here
                   </Link>
