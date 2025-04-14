@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/app/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { withApiKeyAuth } from '@/lib/api-middleware';
+import { notifyOutbreakSystem } from '@/lib/outbreak-notification';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,17 +21,28 @@ export async function POST(request: NextRequest) {
       { key: 'hospitalId', type: 'number' },
     ];
 
+    // Optional fields validation
+    const optionalFields = [
+      { key: 'userId', type: 'number' },
+    ];
+    
     const missingFields = requiredFields.filter(field => {
       // If the field doesn't exist or its type doesn't match
       return !(field.key in body) || typeof body[field.key] !== field.type;
     });
 
-    if (missingFields.length > 0) {
-      console.error('Validation failed. Missing/invalid fields:', missingFields);
+    // Validate optional fields if they exist
+    const invalidOptionalFields = optionalFields.filter(field => {
+      return field.key in body && typeof body[field.key] !== field.type;
+    });
+
+    if (missingFields.length > 0 || invalidOptionalFields.length > 0) {
+      const allInvalidFields = [...missingFields, ...invalidOptionalFields];
+      console.error('Validation failed. Missing/invalid fields:', allInvalidFields);
       return NextResponse.json(
         { 
           error: 'Invalid request data',
-          details: missingFields.map(f => `${f.key} (expected ${f.type})`)
+          details: allInvalidFields.map(f => `${f.key} (expected ${f.type})`)
         },
         { status: 400 }
       );
@@ -76,8 +89,17 @@ export async function POST(request: NextRequest) {
         // Use provided alert if available; otherwise, default to an empty array
         alert: body.alert && Array.isArray(body.alert) ? body.alert : [],
         hospitalId: body.hospitalId,
+        userId: body.userId || null, // Use userId if provided, otherwise null
       },
     });
+
+    // Notify the outbreak detection system about the new appointment
+    try {
+      await notifyOutbreakSystem(appointment.id);
+    } catch (notificationError) {
+      console.error('Failed to notify outbreak system, but appointment was created:', notificationError);
+      // We don't want to fail the appointment creation if notification fails
+    }
 
     console.log('Created appointment:', appointment);
     return NextResponse.json(appointment, { status: 201 });
@@ -100,3 +122,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const GET = withApiKeyAuth(async (req: NextRequest) => {
+  try {
+    // Get query parameters
+    const url = new URL(req.url);
+    const dateAfter = url.searchParams.get('date_after');
+    
+    // Build query filters
+    const where: any = {};
+    
+    // Add date filter if provided
+    if (dateAfter) {
+      where.date = {
+        gte: new Date(dateAfter)
+      };
+    }
+    
+    // Get appointments from database
+    const appointments = await prisma.appointment.findMany({
+      where,
+      include: {
+        hospital: true,
+      },
+    });
+    
+    return NextResponse.json(appointments);
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch appointments' },
+      { status: 500 }
+    );
+  }
+});
