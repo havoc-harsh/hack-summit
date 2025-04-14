@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, Dispatch, SetStateAction, useEffect } from "react";
@@ -24,8 +23,6 @@ import {
 } from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "react-hot-toast";
-import { Toaster } from "react-hot-toast";
 
 interface BedData {
   ICU: number;
@@ -89,17 +86,6 @@ interface Appointment {
   date: string;
   time: string;
   location: string;
-}
-
-interface EmergencyRequest {
-  id: number;
-  serviceType: string;
-  quantity: number;
-  status: string;
-  patientName: string;
-  patientPhone: string;
-  reason: string;
-  requestDate: string;
 }
 
 const Modal = ({
@@ -422,7 +408,7 @@ const Sidebar = ({
               <p className="text-sm text-gray-500">Contact Number</p>
               <input
                 className="text-2xl font-bold text-blue-600 w-full bg-transparent border-b-2 border-gray-200 focus:outline-none focus:border-blue-500"
-                defaultValue={(session.data?.user as any)?.phone || "No phone number"}
+                defaultValue={session.data?.user.phone ?? ""}
               />
             </div>
           </div>
@@ -603,15 +589,12 @@ export default function HospitalDashboard() {
       date: "Tomorrow",
     },
   ]);
-  const [emergencyRequests, setEmergencyRequests] = useState<EmergencyRequest[]>([]);
 
   useEffect(() => {
     if (status === "loading") return;
     if (!session) {
       signIn();
     } else {
-      console.log("Hospital dashboard loaded with user ID:", session.user.id);
-      
       fetch(`/api/hospital/${session.user.id}/appointments`)
         .then((res) => res.json())
         .then((data) => setAppointments(data))
@@ -621,64 +604,6 @@ export default function HospitalDashboard() {
       fetchData("oxygen", setOxygenData);
       fetchData("ambulance", setAmbulanceData);
       fetchData("doctors", setDoctors);
-      
-      // Load emergency requests
-      const hospitalId = session.user.id;
-      console.log("Loading emergency requests for hospital:", hospitalId);
-      
-      // First try to load from localStorage for immediate display
-      if (typeof window !== 'undefined') {
-        try {
-          // Check both storage locations
-          const primary = JSON.parse(localStorage.getItem('emergencyRequests') || '[]');
-          const backup = JSON.parse(localStorage.getItem('emergencyRequestsBackup') || '[]');
-          
-          // Filter valid requests for this hospital
-          const validRequests = [...primary, ...backup].filter(req => 
-            Number(req.hospitalId) === Number(hospitalId) && 
-            ["ambulances", "blood", "oxygen", "icu"].includes(req.serviceType)
-          );
-          
-          // Remove duplicates by ID
-          const uniqueRequests = Array.from(
-            new Map(validRequests.map(item => [item.id, item])).values()
-          );
-          
-          if (uniqueRequests.length > 0) {
-            // Sort by date
-            uniqueRequests.sort((a, b) => 
-              new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()
-            );
-            
-            console.log(`Found ${uniqueRequests.length} emergency requests in localStorage`);
-            setEmergencyRequests(uniqueRequests);
-          }
-        } catch (error) {
-          console.error("Error loading emergency requests from localStorage:", error);
-        }
-      }
-      
-      // Then fetch from the API
-      fetchEmergencyRequests();
-      
-      // Set up polling for emergency requests
-      const intervalId = setInterval(fetchEmergencyRequests, 10000);
-      
-      // Set up event listener for refresh events
-      const handleRefreshEvent = (event: any) => {
-        const { hospitalId } = event.detail;
-        if (hospitalId && hospitalId.toString() === session.user.id.toString()) {
-          console.log("Refreshing emergency requests from event");
-          fetchEmergencyRequests();
-        }
-      };
-      
-      window.addEventListener("refreshEmergencyRequests", handleRefreshEvent);
-      
-      return () => {
-        clearInterval(intervalId);
-        window.removeEventListener("refreshEmergencyRequests", handleRefreshEvent);
-      };
     }
   }, [session, status]);
 
@@ -702,210 +627,6 @@ export default function HospitalDashboard() {
       setData(data);
     } catch (error) {
       console.error(`Error fetching ${endpoint}:`, error);
-    }
-  };
-
-  const debugLocalStorage = () => {
-    if (typeof window !== 'undefined') {
-      try {
-        console.log("============== EMERGENCY REQUESTS DEBUG ==============");
-        
-        // Check primary storage
-        const storedRequests = JSON.parse(localStorage.getItem('emergencyRequests') || '[]');
-        console.log("Total stored requests (primary):", storedRequests.length);
-        
-        // Check backup storage
-        const backupRequests = JSON.parse(localStorage.getItem('emergencyRequestsBackup') || '[]');
-        console.log("Total stored requests (backup):", backupRequests.length);
-        
-        const hospitalId = session?.user?.id;
-        console.log("Current hospital ID:", hospitalId, "(type:", typeof hospitalId, ")");
-        
-        // Log all requests from primary storage
-        console.log("--- PRIMARY STORAGE ---");
-        storedRequests.forEach((req: any, index: number) => {
-          console.log(`Request ${index + 1}:`, {
-            id: req.id,
-            hospitalId: req.hospitalId,
-            type: req.serviceType,
-            status: req.status,
-            matches: Number(req.hospitalId) === Number(hospitalId)
-          });
-        });
-        
-        // Log all requests from backup storage
-        console.log("--- BACKUP STORAGE ---");
-        backupRequests.forEach((req: any, index: number) => {
-          console.log(`Backup ${index + 1}:`, {
-            id: req.id,
-            hospitalId: req.hospitalId,
-            type: req.serviceType,
-            status: req.status,
-            matches: Number(req.hospitalId) === Number(hospitalId)
-          });
-        });
-        
-        // Filter for current hospital from both storage locations
-        const forCurrentHospital = [
-          ...storedRequests.filter((req: any) => Number(req.hospitalId) === Number(hospitalId)),
-          ...backupRequests.filter((req: any) => Number(req.hospitalId) === Number(hospitalId))
-        ];
-        
-        // Remove duplicates by ID
-        const uniqueRequests = Array.from(
-          new Map(forCurrentHospital.map(item => [item.id, item])).values()
-        );
-        
-        console.log("Unique requests for current hospital:", uniqueRequests.length);
-        console.log("============================================");
-        
-        // Add these requests to the state if we found some
-        if (uniqueRequests.length > 0) {
-          // Sort by date, newest first
-          uniqueRequests.sort((a: any, b: any) => {
-            return new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime();
-          });
-          
-          setEmergencyRequests(uniqueRequests);
-          toast.success(`Loaded ${uniqueRequests.length} emergency requests`);
-        }
-      } catch (error) {
-        console.error("Error debugging localStorage:", error);
-      }
-    }
-  };
-
-  const fetchEmergencyRequests = async () => {
-    try {
-      const hospitalId = session?.user?.id;
-      console.log(`[${new Date().toISOString()}] Fetching emergency requests for hospital ${hospitalId}`);
-      
-      // Get requests from server API
-      const response = await fetch(`/api/emergency-request/submit?hospitalId=${hospitalId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        cache: "no-store" // Ensure fresh data
-      });
-      
-      console.log("Emergency requests API response status:", response.status);
-      
-      // Get requests from both localStorage locations
-      let localRequests: any[] = [];
-      if (typeof window !== 'undefined') {
-        try {
-          // Get from primary storage
-          const storedRequests = JSON.parse(localStorage.getItem('emergencyRequests') || '[]');
-          console.log("Raw localStorage requests (primary):", storedRequests.length);
-          
-          // Get from backup storage
-          const backupRequests = JSON.parse(localStorage.getItem('emergencyRequestsBackup') || '[]');
-          console.log("Raw localStorage requests (backup):", backupRequests.length);
-          
-          // Log all requests to help debug
-          [...storedRequests, ...backupRequests].forEach((req: any, index: number) => {
-            console.log(`LocalStorage Request #${index + 1}:`, {
-              id: req.id,
-              hospitalId: req.hospitalId,
-              type: req.serviceType,
-              patient: req.patientName,
-              status: req.status,
-              date: req.requestDate
-            });
-          });
-          
-          // Filter requests from both sources
-          const primaryFiltered = storedRequests.filter((req: any) => {
-            const reqHospitalId = Number(req.hospitalId);
-            const currentHospitalId = Number(hospitalId);
-            return reqHospitalId === currentHospitalId;
-          });
-          
-          const backupFiltered = backupRequests.filter((req: any) => {
-            const reqHospitalId = Number(req.hospitalId);
-            const currentHospitalId = Number(hospitalId);
-            return reqHospitalId === currentHospitalId;
-          });
-          
-          // Combine both filtered lists
-          localRequests = [...primaryFiltered, ...backupFiltered];
-          
-          // Remove duplicates by ID
-          localRequests = Array.from(
-            new Map(localRequests.map(item => [item.id, item])).values()
-          );
-          
-          console.log("Combined filtered localStorage requests:", localRequests.length);
-        } catch (localError) {
-          console.error("Error reading from localStorage:", localError);
-        }
-      }
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error("API error:", errorData || response.statusText);
-        toast.error("Failed to fetch emergency requests from server");
-        
-        // Fall back to localStorage data only if API failed
-        if (localRequests.length > 0) {
-          console.log("Using localStorage requests as fallback");
-          setEmergencyRequests(localRequests);
-        }
-        return;
-      }
-      
-      // Combine server data with localStorage data
-      const serverData = await response.json();
-      console.log("Fetched emergency requests from server:", serverData, "Count:", serverData.length);
-      
-      // Merge requests from both sources (prefer server data for duplicates)
-      const serverIds = serverData.map((req: any) => req.id);
-      const uniqueLocalRequests = localRequests.filter((req: any) => !serverIds.includes(req.id));
-      
-      const allRequests = [...serverData, ...uniqueLocalRequests];
-      console.log("Combined emergency requests:", allRequests.length);
-      
-      // Filter out any potential hardcoded test data by ensuring we only accept real service types
-      const validServiceTypes = ["ambulances", "blood", "oxygen", "icu"];
-      const filteredRequests = allRequests.filter((req: any) => {
-        const isValidService = validServiceTypes.includes(req.serviceType);
-        if (!isValidService) {
-          console.log(`Filtering out request with invalid service type: ${req.serviceType}`);
-        }
-        return isValidService;
-      });
-      
-      // Sort by date, newest first
-      filteredRequests.sort((a: any, b: any) => {
-        return new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime();
-      });
-      
-      console.log("Final filtered emergency requests:", filteredRequests.length);
-      setEmergencyRequests(filteredRequests);
-    } catch (error) {
-      console.error("Error fetching emergency requests:", error);
-      toast.error("Failed to fetch emergency requests");
-      
-      // Fallback to localStorage
-      if (typeof window !== 'undefined') {
-        try {
-          const storedRequests = JSON.parse(localStorage.getItem('emergencyRequests') || '[]');
-          const hospitalId = session?.user?.id;
-          const localRequests = storedRequests.filter((req: any) => {
-            const reqHospitalId = Number(req.hospitalId);
-            const currentHospitalId = Number(hospitalId);
-            return reqHospitalId === currentHospitalId;
-          });
-          
-          if (localRequests.length > 0) {
-            console.log("Using localStorage requests as fallback after error");
-            setEmergencyRequests(localRequests);
-          }
-        } catch (localError) {
-          console.error("Error reading from localStorage fallback:", localError);
-        }
-      }
     }
   };
 
@@ -1006,180 +727,20 @@ export default function HospitalDashboard() {
     }
   };
 
-  // Add these functions to handle request status updates
-  const handleUpdateRequestStatus = async (requestId: number, status: string) => {
-    try {
-      const response = await fetch(`/api/emergency-request/${requestId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      });
-
-      if (response.ok) {
-        // Update the UI by refetching emergency requests
-        fetchEmergencyRequests();
-      } else {
-        console.error('Failed to update request status');
-      }
-    } catch (error) {
-      console.error('Error updating request status:', error);
-    }
-  };
-
-  // Add these functions to the HospitalDashboard component where other handler functions are defined
-  const handleApproveRequest = async (id: number) => {
-    try {
-      const response = await fetch(`/api/emergency-request/submit/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "approved" }),
-      });
-
-      // Also update in localStorage for persistence
-      if (typeof window !== 'undefined') {
-        try {
-          const storedRequests = JSON.parse(localStorage.getItem('emergencyRequests') || '[]');
-          const updatedRequests = storedRequests.map((req: any) => {
-            if (Number(req.id) === Number(id)) {
-              return { ...req, status: "approved", updatedAt: new Date() };
-            }
-            return req;
-          });
-          localStorage.setItem('emergencyRequests', JSON.stringify(updatedRequests));
-          console.log("Updated request status in localStorage");
-        } catch (localError) {
-          console.error("Error updating localStorage:", localError);
-        }
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error("API error:", errorData || response.statusText);
-        toast.error("Failed to approve request");
-        return;
-      }
-
-      // Update the UI by refreshing the requests
-      fetchEmergencyRequests();
-      toast.success("Request approved successfully");
-    } catch (error) {
-      console.error("Error approving request:", error);
-      toast.error("Failed to approve request");
-      // Still update the UI since we updated localStorage
-      fetchEmergencyRequests();
-    }
-  };
-
-  const handleRejectRequest = async (id: number) => {
-    try {
-      const response = await fetch(`/api/emergency-request/submit/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "rejected" }),
-      });
-
-      // Also update in localStorage for persistence
-      if (typeof window !== 'undefined') {
-        try {
-          const storedRequests = JSON.parse(localStorage.getItem('emergencyRequests') || '[]');
-          const updatedRequests = storedRequests.map((req: any) => {
-            if (Number(req.id) === Number(id)) {
-              return { ...req, status: "rejected", updatedAt: new Date() };
-            }
-            return req;
-          });
-          localStorage.setItem('emergencyRequests', JSON.stringify(updatedRequests));
-          console.log("Updated request status in localStorage");
-        } catch (localError) {
-          console.error("Error updating localStorage:", localError);
-        }
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error("API error:", errorData || response.statusText);
-        toast.error("Failed to reject request");
-        return;
-      }
-
-      // Update the UI by refreshing the requests
-      fetchEmergencyRequests();
-      toast.success("Request rejected successfully");
-    } catch (error) {
-      console.error("Error rejecting request:", error);
-      toast.error("Failed to reject request");
-      // Still update the UI since we updated localStorage
-      fetchEmergencyRequests();
-    }
-  };
-
-  // Add this function to create a test emergency request
-  const createTestRequest = () => {
-    const hospitalId = session?.user?.id;
-    if (!hospitalId) {
-      toast.error("Hospital ID not found");
-      return;
-    }
-    
-    const testRequest = {
-      id: Date.now(),
-      hospitalId: Number(hospitalId),
-      serviceType: ["ambulances", "blood", "oxygen", "icu"][Math.floor(Math.random() * 4)],
-      quantity: Math.floor(Math.random() * 5) + 1,
-      status: "pending",
-      patientName: "Test Patient",
-      patientId: null,
-      patientPhone: "555-123-4567",
-      reason: "Test emergency request",
-      latitude: 30.7333,
-      longitude: 76.7794,
-      requestDate: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    // Save to localStorage
-    if (typeof window !== 'undefined') {
-      try {
-        const storedRequests = JSON.parse(localStorage.getItem('emergencyRequests') || '[]');
-        storedRequests.push(testRequest);
-        localStorage.setItem('emergencyRequests', JSON.stringify(storedRequests));
-        console.log("Added test request to localStorage");
-        
-        // Update UI
-        fetchEmergencyRequests();
-        toast.success("Test request created");
-      } catch (localError) {
-        console.error("Error adding test request:", localError);
-        toast.error("Failed to create test request");
-      }
-    }
-  };
-
   return (
-    <div className="bg-white dark:bg-gray-900 min-h-screen">
-      <Toaster position="top-right" />
-      
-      <header className="border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30 bg-white dark:bg-gray-900">
-        <Sidebar
-          isCollapsed={isCollapsed}
-          toggleSidebar={() => setIsCollapsed(!isCollapsed)}
-          bedData={bedData}
-          setBedData={setBedData}
-          bloodData={bloodData}
-          setBloodData={setBloodData}
-          oxygenData={oxygenData}
-          setOxygenData={setOxygenData}
-          ambulanceData={ambulanceData}
-          setAmbulanceData={setAmbulanceData}
-        />
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900">
+      <Sidebar
+        isCollapsed={isCollapsed}
+        toggleSidebar={() => setIsCollapsed(!isCollapsed)}
+        bedData={bedData}
+        setBedData={setBedData}
+        bloodData={bloodData}
+        setBloodData={setBloodData}
+        oxygenData={oxygenData}
+        setOxygenData={setOxygenData}
+        ambulanceData={ambulanceData}
+        setAmbulanceData={setAmbulanceData}
+      />
 
       <main className={`transition-all duration-300 ${isCollapsed ? "ml-20" : "ml-64"} pt-20 p-8`}>
         <div className="max-w-7xl mx-auto">
@@ -1281,122 +842,27 @@ export default function HospitalDashboard() {
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between gap-3 mb-5">
-                <div className="flex items-center gap-2">
-                  <Bell className="w-6 h-6 text-indigo-600" />
-                  <h2 className="text-xl font-semibold">
-                    Emergency Requests
-                  </h2>
-                </div>
-                <button 
-                  onClick={() => {
-                    const hospitalId = session?.user?.id;
-                    // Only show real patient emergency requests, not test or hardcoded data
-                    if (typeof window !== 'undefined') {
-                      try {
-                        // Check both localStorage locations for emergency requests
-                        const primary = JSON.parse(localStorage.getItem('emergencyRequests') || '[]');
-                        const backup = JSON.parse(localStorage.getItem('emergencyRequestsBackup') || '[]');
-                        
-                        // Combine and filter by this hospital ID
-                        const combined = [...primary, ...backup].filter(req => 
-                          Number(req.hospitalId) === Number(hospitalId) && 
-                          ["ambulances", "blood", "oxygen", "icu"].includes(req.serviceType)
-                        );
-                        
-                        // Remove duplicates
-                        const unique = Array.from(
-                          new Map(combined.map(item => [item.id, item])).values()
-                        );
-                        
-                        // Sort by date
-                        unique.sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
-                        
-                        // Update state
-                        if (unique.length > 0) {
-                          setEmergencyRequests(unique);
-                          toast.success(`Found ${unique.length} emergency requests`);
-                        } else {
-                          toast.error("No emergency requests found for this hospital");
-                        }
-                      } catch (error) {
-                        console.error("Error refreshing emergency requests:", error);
-                      }
-                    }
-                    
-                    // Also try the API endpoint
-                    fetchEmergencyRequests();
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                >
-                  <span>Refresh</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 2v6h-6"></path>
-                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-                    <path d="M3 22v-6h6"></path>
-                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
-                  </svg>
-                </button>
+              <div className="flex items-center gap-3 mb-5">
+                <Bell className="w-6 h-6 text-indigo-600" />
+                <h2 className="text-xl font-semibold">
+                  Hospital Announcements
+                </h2>
               </div>
               <div className="space-y-4">
-                {emergencyRequests && emergencyRequests.length > 0 ? (
-                  emergencyRequests.map((request) => (
-                    <div
-                      key={request.id}
-                      className="p-4 bg-gray-50 rounded-xl border-l-4 border-red-500"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium text-gray-800">
-                            {request.serviceType?.charAt(0).toUpperCase() + request.serviceType?.slice(1) || "Service"} Request - {request.quantity || 0} units
-                          </h3>
-                          <p className="text-sm text-gray-600 mt-1">{request.reason || "Emergency request"}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              request.status === "approved" ? "bg-green-100 text-green-800" : 
-                              request.status === "rejected" ? "bg-red-100 text-red-800" : 
-                              "bg-yellow-100 text-yellow-800"
-                            }`}>
-                              {request.status || "pending"}
-                            </div>
-                            <p className="text-xs text-gray-400">
-                              {request.requestDate ? new Date(request.requestDate).toLocaleString() : "Unknown date"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex space-x-2 mt-2">
-                          <button
-                            onClick={() => handleApproveRequest(request.id)}
-                            className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200"
-                            disabled={request.status === "approved" || request.status === "rejected"}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleRejectRequest(request.id)}
-                            className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
-                            disabled={request.status === "approved" || request.status === "rejected"}
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <div className="text-gray-400 text-xs flex flex-col">
-                          <span className="inline-block">{request.patientName || "Anonymous"}</span>
-                          {request.patientPhone && (
-                            <span className="inline-block">{request.patientPhone}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center">
-                    <p className="text-gray-500">No emergency requests at this time</p>
-                    <p className="text-sm text-gray-400 mt-2">When patients submit emergency service requests, they will appear here</p>
+                {announcements.map((announcement) => (
+                  <div
+                    key={announcement.id}
+                    className="p-4 bg-gray-50 rounded-xl"
+                  >
+                    <h3 className="text-md font-bold text-gray-800">
+                      {announcement.title}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {announcement.message}
+                    </p>
+                    <p className="text-xs text-gray-400">{announcement.date}</p>
                   </div>
-                )}
+                ))}
               </div>
             </div>
 

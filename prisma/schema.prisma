@@ -10,21 +10,21 @@ datasource db {
 model User {
   id             Int            @id @default(autoincrement())
   email          String         @unique
-  alert          String[]       @default([])
+  alert          String[]        @default([])
   password       String
   name           String
   profile        Profile?
   medicalProfile MedicalProfile?
-  latitude       Float          @default(0.0)
-  longitude      Float          @default(0.0)
+  latitude        Float          @default(0.0)
+  longitude       Float          @default(0.0)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime
-  appointments   Appointment[]
+ // Added relation to Appointment
 }
 
 model Profile {
   id     Int     @id @default(autoincrement())
-  bio    String?
+  bio    String? // No default for optional text
   userId Int     @unique
   user   User    @relation(fields: [userId], references: [id])
 }
@@ -37,10 +37,9 @@ model MedicalProfile {
   conditions        String[]         @default([])
   vaccinations      String[]         @default([])
   lastCheckup       DateTime         @default(now())
-  phone             String           @default("+91")
   care_instructions String[]         @default([])
   favoriteDoctors   FavoriteDoctor[]
-  userId            Int              @unique @map("user_id") @default(1)
+  userId            Int              @unique @map("user_id") @default(1) // Temporary default
   user              User             @relation(fields: [userId], references: [id])
 }
 
@@ -58,19 +57,19 @@ model Hospital {
   email           String         @unique
   password        String
   licenseNumber   String         @unique
-  phone           String         @default("")
-  contactPerson   String         @default("")
-  address         String         @default("")
-  consultationFee Float          @default(0.0)
-  rating          Float          @default(0.0)
-  waitTime        Int            @default(0)
+  phone   String         @default("")
+  contactPerson           String   @default("")
+  address        String         @default("")
+  consultationFee Float          @default(0.0) // Default fee
+  rating          Float          @default(0.0) // Default rating
+  waitTime        Int            @default(0)   // Default wait time in minutes
   latitude        Float          @default(0.0)
   longitude       Float          @default(0.0)
-  specialities    String[]       @default([])
-  about           String         @default("")
-  nextAvailable   DateTime       @default(now())
-  verified        Boolean        @default(false)
-  amenities       String[]       @default([])
+  specialities    String[]       @default([])  // Default to empty array
+  about           String         @default("")  // Default to empty string
+  nextAvailable   DateTime       @default(now()) // Default to current time
+  verified        Boolean        @default(false) // Default to unverified
+  amenities       String[]       @default([])  // Default to empty array
   beds            Bed?           @relation("HospitalBeds")
   blood           Blood?         @relation("HospitalBlood")
   oxygen          Oxygen?        @relation("HospitalOxygen")
@@ -79,9 +78,9 @@ model Hospital {
   alerts          Alert[]
   announcements   Announcement[]
   appointments    Appointment[]
-  emergencyRequests EmergencyRequest[]
   stats           Stats?
   createdAt       DateTime       @default(now())
+
 }
 
 model Bed {
@@ -126,57 +125,50 @@ model Doctor {
   id             Int       @id @default(autoincrement())
   name           String
   specialization String
-  shift          String    @default("Not Assigned")
+  shift          String    @default("Not Assigned") // Default shift
   hospitalId     Int
   hospital       Hospital  @relation(fields: [hospitalId], references: [id])
   favoritedBy    FavoriteDoctor[]
 }
 
 model Alert {
-  id                 Int       @id @default(autoincrement())
-  type               String
-  location           String
-  time               DateTime  @default(now())
-  commonSymptoms     String[]  @default([])
-  symptomCounts      Int[]     @default([])
-  symptomFrequencies Float[]   @default([])
-  possibleDiseases   String[]  @default([])
-  severity           String    @default("Unknown")
-  precautions        String[]  @default([])
-  description        String    @default("")
-  outbreakRadiusKm   Float     @default(0.0)
-  centerLatitude     Float     @default(0.0)
-  centerLongitude    Float     @default(0.0)
-  appointmentsCount  Int       @default(0)
-  thresholdUsed      Float     @default(0.0)
-  hospitalId         Int
-  hospital           Hospital  @relation(fields: [hospitalId], references: [id])
+  id         Int       @id @default(autoincrement())
+  type       String
+  location   String
+  time       DateTime  @default(now()) // Default to current time
+  hospitalId Int
+  hospital   Hospital  @relation(fields: [hospitalId], references: [id])
 }
 
 model Announcement {
   id         Int       @id @default(autoincrement())
   title      String
   message    String
-  date       DateTime  @default(now())
+  date       DateTime  @default(now()) // Default to current time
   hospitalId Int
   hospital   Hospital  @relation(fields: [hospitalId], references: [id])
 }
 
 model Appointment {
-  id             Int       @id @default(autoincrement())
-  patient        String
-  phone          String
-  symptoms       String
-  latitude       Float
-  longitude      Float
-  date           DateTime
-  time           String
-  alert          String[] @default([])
-  status         String   @default("scheduled")
-  paymentStatus  String   @default("pending")
-  hospitalId     Int
-  hospital       Hospital  @relation(fields: [hospitalId], references: [id])
-  userId         Int?
-  user           User?     @relation(fields: [userId], references: [id])
-  createdAt      DateTime  @default(now())
+  id         Int       @id @default(autoincrement())
+  patient    String    // Name of the patient
+  phone      String    // Phone number of the patient
+  symptoms   String    // Description of symptoms
+  latitude   Float     // Latitude of the patient's location
+  longitude  Float     // Longitude of the patient's location
+  date       DateTime  // Date of the appointment
+  time      String    // Time of the appointment (e.g., "10:00 AM")
+  alert      String[] @default([])  // Whether the appointment is urgent
+  hospitalId Int       // Foreign key to the Hospital model
+  hospital   Hospital  @relation(fields: [hospitalId], references: [id])
+// Relationship to User
+}
+
+model Stats {
+  id               Int      @id @default(autoincrement())
+  satisfaction     Int      @default(0)
+  recoveryRate     Int      @default(0)
+  emergencyResponse Int     @default(0)
+  hospitalId       Int      @unique
+  hospital         Hospital @relation(fields: [hospitalId], references: [id])
 }
